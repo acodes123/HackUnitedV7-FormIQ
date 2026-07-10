@@ -9,7 +9,10 @@ const api = axios.create({
 export async function analyzeVideo(file) {
   const form = new FormData()
   form.append('file', file)
-  const { data } = await api.post('/analyze', form, {
+
+  const path = API_BASE.includes('localhost') ? '/analyze' : '/api/analyze'
+
+  const { data } = await api.post(path, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
   })
