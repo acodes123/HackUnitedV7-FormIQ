@@ -2,14 +2,9 @@ import os
 import sys
 import uuid
 import traceback
-import cv2
-import base64
-import numpy as np
 from fastapi import FastAPI, UploadFile, File, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from pose_analyzer import PoseAnalyzer
-from rules import evaluate_elbow, evaluate_knee, evaluate_release, calculate_score
 from schemas import AnalyzeResponse
 
 app = FastAPI(title="FormIQ – Basketball Shot Analyzer")
@@ -26,23 +21,21 @@ app.add_middleware(
 TEMP_DIR = "/tmp/formiq_videos" if sys.platform != "win32" else "temp_videos"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-analyzer = None
+
+def _import_deps():
+    import cv2
+    import numpy as np
+    from pose_analyzer import PoseAnalyzer
+    from rules import evaluate_elbow, evaluate_knee, evaluate_release, calculate_score
+    return cv2, np, PoseAnalyzer, evaluate_elbow, evaluate_knee, evaluate_release, calculate_score
 
 
-def get_analyzer():
-    global analyzer
-    if analyzer is None:
-        analyzer = PoseAnalyzer()
-    return analyzer
+def _load_video(path: str):
+    cv2, np, PoseAnalyzer, *_ = _import_deps()
+    from pose_analyzer import angle_between
 
-
-def encode_frame(frame: np.ndarray) -> str:
-    _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-    return base64.b64encode(buffer).decode("utf-8")
-
-
-def find_key_frames(video_path: str):
-    cap = cv2.VideoCapture(video_path)
+    analyzer = PoseAnalyzer()
+    cap = cv2.VideoCapture(path)
     frames = []
     frame_idx = 0
     max_jump_frame = None
@@ -55,12 +48,12 @@ def find_key_frames(video_path: str):
         if not ret:
             break
 
-        landmarks = get_analyzer().process_frame(frame)
+        landmarks = analyzer.process_frame(frame)
         if landmarks is None:
             frame_idx += 1
             continue
 
-        wrist_y, shoulder_y = get_analyzer().get_wrist_shoulder_y(landmarks)
+        wrist_y, shoulder_y = analyzer.get_wrist_shoulder_y(landmarks)
 
         if len(frames) == 0:
             frames.append((frame_idx, frame.copy(), landmarks))
@@ -80,18 +73,26 @@ def find_key_frames(video_path: str):
     cap.release()
 
     key_frames = []
-    seen_indices = set()
+    seen = set()
     for f in [frames[0] if frames else None, max_jump_frame, release_frame]:
-        if f is not None and f[0] not in seen_indices:
+        if f is not None and f[0] not in seen:
             key_frames.append(f)
-            seen_indices.add(f[0])
+            seen.add(f[0])
 
-    return key_frames
+    return key_frames, analyzer
+
+
+def _encode_frame(frame, cv2):
+    import base64
+    _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    return base64.b64encode(buffer).decode("utf-8")
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_video(file: UploadFile = File(...)):
     try:
+        cv2, np, PoseAnalyzer, evaluate_elbow, evaluate_knee, evaluate_release, calculate_score = _import_deps()
+
         temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.mp4")
         content = await file.read()
 
@@ -102,7 +103,7 @@ async def analyze_video(file: UploadFile = File(...)):
             f.write(content)
 
         try:
-            key_frames = find_key_frames(temp_path)
+            key_frames, analyzer = _load_video(temp_path)
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -119,7 +120,7 @@ async def analyze_video(file: UploadFile = File(...)):
 
         all_angles = {"elbow": [], "knee": []}
         for _, frame, landmarks in key_frames:
-            angles = get_analyzer().compute_angles(landmarks, side)
+            angles = analyzer.compute_angles(landmarks, side)
             if "elbow" in angles:
                 all_angles["elbow"].append(angles["elbow"])
             if "knee" in angles:
@@ -131,7 +132,7 @@ async def analyze_video(file: UploadFile = File(...)):
         min_wrist = float("inf")
         min_shoulder = None
         for _, frame, landmarks in key_frames:
-            wrist_y, shoulder_y = get_analyzer().get_wrist_shoulder_y(landmarks, side)
+            wrist_y, shoulder_y = analyzer.get_wrist_shoulder_y(landmarks, side)
             if wrist_y is not None and wrist_y < min_wrist:
                 min_wrist = wrist_y
                 min_shoulder = shoulder_y
@@ -142,13 +143,13 @@ async def analyze_video(file: UploadFile = File(...)):
         knee_score, knee_fb = evaluate_knee(avg_knee)
         release_score, release_fb = evaluate_release(wrist_y_rel, min_shoulder)
 
-        total = calculate_score([elbow_score, knee_score, release_score])
+        total = elbow_score + knee_score + release_score
         feedback = [elbow_fb, knee_fb, release_fb]
 
         annotated_b64 = []
         for _, frame, landmarks in key_frames:
-            skeleton_frame = get_analyzer().draw_skeleton(frame, landmarks)
-            angles = get_analyzer().compute_angles(landmarks, side)
+            skeleton_frame = analyzer.draw_skeleton(frame, landmarks)
+            angles = analyzer.compute_angles(landmarks, side)
             y_offset = 30
             for name, val in angles.items():
                 cv2.putText(
@@ -156,7 +157,7 @@ async def analyze_video(file: UploadFile = File(...)):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2,
                 )
                 y_offset += 30
-            annotated_b64.append(encode_frame(skeleton_frame))
+            annotated_b64.append(_encode_frame(skeleton_frame, cv2))
 
         return AnalyzeResponse(
             score=total,
@@ -177,36 +178,40 @@ async def analyze_video(file: UploadFile = File(...)):
 
 @router.get("/health")
 async def health():
-    deps = {"cv2": False, "mediapipe": False, "numpy": False}
+    deps = {"cv2": False, "mediapipe": False, "numpy": False, "pose_analyzer": False}
+
     try:
         import cv2 as _
         deps["cv2"] = True
-    except Exception:
-        pass
+    except Exception as e:
+        deps["cv2_error"] = str(e)
+
     try:
         import mediapipe as _
         deps["mediapipe"] = True
-    except Exception:
-        pass
+    except Exception as e:
+        deps["mediapipe_error"] = str(e)
+
     try:
         import numpy as _
         deps["numpy"] = True
-    except Exception:
-        pass
-
-    analyzer_ok = False
-    try:
-        get_analyzer()
-        analyzer_ok = True
     except Exception as e:
-        pass
+        deps["numpy_error"] = str(e)
 
+    try:
+        from pose_analyzer import PoseAnalyzer
+        p = PoseAnalyzer()
+        deps["pose_analyzer"] = True
+    except Exception as e:
+        deps["pose_analyzer_error"] = str(e)
+
+    all_ok = all(v for k, v in deps.items() if not k.endswith("_error"))
     return {
-        "status": "ok" if all(deps.values()) and analyzer_ok else "degraded",
+        "status": "ok" if all_ok else "degraded",
         "dependencies": deps,
-        "analyzer": analyzer_ok,
         "temp_dir": TEMP_DIR,
-        "temp_writable": os.access(TEMP_DIR, os.W_OK),
+        "temp_writable": os.access(TEMP_DIR, os.W_OK) if os.path.exists(TEMP_DIR) else False,
+        "python_version": sys.version,
     }
 
 
