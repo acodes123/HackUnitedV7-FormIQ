@@ -11,9 +11,7 @@ export async function analyzeVideo(file) {
   const form = new FormData()
   form.append('file', file)
 
-  const path = API_BASE ? '/analyze' : '/api/analyze'
-
-  const { data } = await api.post(path, form, {
+  const { data } = await api.post('/api/analyze', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
   })

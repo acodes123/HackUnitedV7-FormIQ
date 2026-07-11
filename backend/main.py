@@ -3,7 +3,7 @@ import uuid
 import cv2
 import base64
 import numpy as np
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
 from pose_analyzer import PoseAnalyzer
@@ -11,6 +11,7 @@ from rules import evaluate_elbow, evaluate_knee, evaluate_release, calculate_sco
 from schemas import AnalyzeResponse
 
 app = FastAPI(title="FormIQ – Basketball Shot Analyzer")
+router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -94,7 +95,7 @@ def find_key_frames(video_path: str):
     return key_frames
 
 
-@app.post("/analyze", response_model=AnalyzeResponse)
+@router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_video(file: UploadFile = File(...)):
     """
     Upload a basketball shooting video (mp4).
@@ -185,6 +186,8 @@ async def analyze_video(file: UploadFile = File(...)):
             os.remove(temp_path)
 
 
-@app.get("/health")
+@router.get("/health")
 async def health():
     return {"status": "ok"}
+
+app.include_router(router)
