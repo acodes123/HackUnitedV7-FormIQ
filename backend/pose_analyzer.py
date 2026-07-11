@@ -16,14 +16,9 @@ def angle_between(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
 class PoseAnalyzer:
     def __init__(self):
         import cv2
+        from mediapipe.python.solutions import pose as mp_pose
 
         self._cv2 = cv2
-        try:
-            from mediapipe.python.solutions import pose as mp_pose
-        except ImportError:
-            import mediapipe as mp
-            mp_pose = mp.solutions.pose
-
         self._pose = mp_pose.Pose(
             static_image_mode=False,
             model_complexity=1,
