@@ -1,10 +1,5 @@
-﻿import cv2
-import mediapipe as mp
-import numpy as np
+﻿import numpy as np
 from typing import Optional
-
-
-mp_pose = mp.solutions.pose
 
 
 def angle_between(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
@@ -27,7 +22,11 @@ def angle_between(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
 
 class PoseAnalyzer:
     def __init__(self):
-        self.pose = mp_pose.Pose(
+        import mediapipe as mp
+        import cv2
+
+        self._cv2 = cv2
+        self._pose = mp.solutions.pose.Pose(
             static_image_mode=False,
             model_complexity=1,
             enable_segmentation=False,
@@ -35,10 +34,11 @@ class PoseAnalyzer:
             min_tracking_confidence=0.5,
         )
 
-    def process_frame(self, frame: np.ndarray) -> Optional[dict]:
-        """Run MediaPipe on a single frame, return landmark dict or None."""
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.pose.process(rgb)
+    def process_frame(self, frame) -> Optional[dict]:
+        import mediapipe as mp
+
+        rgb = self._cv2.cvtColor(frame, self._cv2.COLOR_BGR2RGB)
+        results = self._pose.process(rgb)
         if not results.pose_landmarks:
             return None
 
@@ -58,8 +58,8 @@ class PoseAnalyzer:
 
         return landmarks
 
-    def draw_skeleton(self, frame: np.ndarray, landmarks: dict) -> np.ndarray:
-        """Draw pose skeleton lines and joints on the frame."""
+    def draw_skeleton(self, frame, landmarks: dict):
+        cv2 = self._cv2
         connections = [
             ("left_shoulder", "left_elbow"), ("right_shoulder", "right_elbow"),
             ("left_elbow", "left_wrist"), ("right_elbow", "right_wrist"),
@@ -80,7 +80,6 @@ class PoseAnalyzer:
         return overlay
 
     def compute_angles(self, landmarks: dict, side: str = "right") -> dict:
-        """Compute elbow and knee angles for the given side."""
         prefix = side
         shoulder = landmarks.get(f"{prefix}_shoulder")
         elbow = landmarks.get(f"{prefix}_elbow")
@@ -97,7 +96,6 @@ class PoseAnalyzer:
         return angles
 
     def get_wrist_shoulder_y(self, landmarks: dict, side: str = "right") -> tuple:
-        """Return (wrist_y, shoulder_y) for release timing check."""
         prefix = side
         wrist = landmarks.get(f"{prefix}_wrist")
         shoulder = landmarks.get(f"{prefix}_shoulder")
