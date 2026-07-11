@@ -3,13 +3,6 @@ from typing import Optional
 
 
 def angle_between(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
-    """
-    Calculate angle at point b between vectors ba and bc.
-    Uses law of cosines: angle = arccos((ba·bc) / (|ba| * |bc|))
-
-    For example, elbow angle = angle_between(shoulder, elbow, wrist)
-    gives the angle at the elbow joint.
-    """
     ba = a - b
     bc = c - b
     dot = np.dot(ba, bc)
@@ -22,11 +15,16 @@ def angle_between(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
 
 class PoseAnalyzer:
     def __init__(self):
-        import mediapipe as mp
         import cv2
 
         self._cv2 = cv2
-        self._pose = mp.solutions.pose.Pose(
+        try:
+            from mediapipe.python.solutions import pose as mp_pose
+        except ImportError:
+            import mediapipe as mp
+            mp_pose = mp.solutions.pose
+
+        self._pose = mp_pose.Pose(
             static_image_mode=False,
             model_complexity=1,
             enable_segmentation=False,
@@ -35,8 +33,6 @@ class PoseAnalyzer:
         )
 
     def process_frame(self, frame) -> Optional[dict]:
-        import mediapipe as mp
-
         rgb = self._cv2.cvtColor(frame, self._cv2.COLOR_BGR2RGB)
         results = self._pose.process(rgb)
         if not results.pose_landmarks:
