@@ -1,86 +1,91 @@
 # FormIQ – AI Basketball Shot Analyzer 🏀
 
-Analyze your basketball shooting form from video using AI pose estimation. Upload a video of your shot and get instant feedback on elbow angle, knee bend, and release timing.
+Analyze your basketball shooting form from video using AI pose estimation.
+Upload your shot and get instant feedback on elbow angle, knee bend, and release timing.
 
-## Project Structure
-
-```
-formiq/
-├── backend/              # Python FastAPI server
-│   ├── main.py           # API endpoints
-│   ├── pose_analyzer.py  # MediaPipe pose detection + angle computation
-│   ├── rules.py          # Basketball form rules + scoring
-│   ├── schemas.py        # Pydantic response models
-│   └── requirements.txt
-├── frontend/             # React + Vite + Tailwind
-│   ├── src/
-│   │   ├── pages/        # UploadPage, ResultsPage
-│   │   ├── components/   # VideoUploader, ScoreDisplay, FeedbackList
-│   │   └── api.js        # Axios client
-│   └── ...
-├── sample_video/         # Test clips
-└── README.md
-```
-
-## Setup
+## Quick Start (Local Dev)
 
 ### Backend
-
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate    # Windows
+venv\Scripts\activate      # Windows
 # source venv/bin/activate  # Mac/Linux
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
 ### Frontend
-
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open http://localhost:5173
+
+## Deploy
+
+### Frontend → Vercel
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+1. Connect your GitHub repo
+2. Vercel auto-detects the `vercel.json` config
+3. Set `VITE_API_URL` env var to your deployed Railway backend URL
+
+### Backend → Railway
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
+1. Click the button or create a new Railway project
+2. Connect your GitHub repo, set root directory to `backend/`
+3. Railway auto-detects the `Dockerfile`
+4. It deploys at `https://your-app.up.railway.app`
+5. Copy that URL → set as `VITE_API_URL` in Vercel
+
+Or deploy manually:
+```bash
+# Install Railway CLI
+npm i -g @railway/cli
+railway login
+railway init
+railway up --root-dir backend
+```
 
 ## How It Works
 
-1. Upload an mp4 video of a basketball shot
-2. Backend extracts key frames (start, max jump height, release point)
-3. MediaPipe Pose detects body landmarks (shoulders, elbows, wrists, hips, knees, ankles)
-4. Angle calculation using law of cosines:
-   - **Elbow angle**: angle between shoulder → elbow → wrist
-   - **Knee angle**: angle between hip → knee → ankle
-5. Rule-based scoring:
-   - Elbow at release: ideal 85°–100° (40 pts)
-   - Knee bend: ideal 130°–145° (30 pts)
-   - Release timing: wrist above shoulder at peak (30 pts)
-6. Returns score (0–100), feedback bullets, and annotated frames
+1. **Upload** an mp4 of your basketball shot
+2. **Pose Detection**: MediaPipe Pose extracts body landmarks per frame
+3. **Angle Math**: Law of cosines on shoulder→elbow→wrist and hip→knee→ankle
+4. **Scoring** (out of 100):
 
-## Scoring
-
-| Rule | Max Points | Ideal Range |
-|------|-----------|-------------|
-| Elbow angle | 40 | 85°–100° |
+| Rule | Points | Ideal |
+|------|--------|-------|
+| Elbow at release | 40 | 85°–100° |
 | Knee bend | 30 | 130°–145° |
 | Release timing | 30 | Wrist above shoulder |
 
-## Deployment
+5. **Results**: Score circle, skeleton overlay on key frames, feedback bullets
 
-**Frontend** (Vercel):
-```bash
-cd frontend
-npm run build
-# Connect dist/ folder to Vercel or use Vercel CLI
+## Project Structure
+
 ```
-
-Set `VITE_API_URL` environment variable to your deployed backend URL.
-
-**Backend**: Deploy to Railway, Render, or Fly.io. The FastAPI app listens on port 8000 by default.
+├── frontend/          # React + Vite + Tailwind
+│   ├── src/
+│   │   ├── pages/     # UploadPage, ResultsPage
+│   │   ├── components/ # VideoUploader, ScoreDisplay, FeedbackList
+│   │   └── api.js     # Axios → backend
+│   └── vercel.json
+├── backend/           # Python FastAPI
+│   ├── main.py        # API endpoints
+│   ├── pose_analyzer.py # MediaPipe + angles
+│   ├── rules.py       # Form rules + scoring
+│   ├── schemas.py     # Pydantic models
+│   ├── Dockerfile     # Railway-ready
+│   └── requirements.txt
+├── sample_video/      # Test clip
+├── vercel.json        # Vercel monorepo config
+└── README.md
+```
 
 ## Tech Stack
 
-- **Frontend**: React, Vite, Tailwind CSS, React Router, Axios
-- **Backend**: Python, FastAPI, MediaPipe, OpenCV, NumPy
+**Frontend**: React, Vite, Tailwind CSS, React Router, Axios
+**Backend**: Python, FastAPI, MediaPipe Pose, OpenCV, NumPy
