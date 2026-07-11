@@ -30,6 +30,10 @@ def _analyze_video(path: str):
 
     analyzer = PoseAnalyzer()
     cap = cv2.VideoCapture(path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    # Skip frames to speed up processing on low-CPU environments
+    skip = max(1, int(fps / 6))  # process ~6 frames per second
+
     frames = []
     frame_idx = 0
     max_jump_frame = None
@@ -41,6 +45,10 @@ def _analyze_video(path: str):
         ret, frame = cap.read()
         if not ret:
             break
+
+        if frame_idx % skip != 0:
+            frame_idx += 1
+            continue
 
         landmarks = analyzer.process_frame(frame)
         if landmarks is None:

@@ -12,7 +12,7 @@ export async function analyzeVideo(file) {
 
   const { data } = await api.post('/api/analyze', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 120000,
+    timeout: 300000,
   })
   return data
 }
