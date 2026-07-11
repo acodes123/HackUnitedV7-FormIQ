@@ -26,28 +26,26 @@ Open http://localhost:5173
 
 ## Deploy
 
+### Backend → Render (Free, no credit card)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+1. Click the button above, or go to [render.com](https://render.com) and sign up with GitHub (no credit card)
+2. Click **New +** → **Web Service** → connect your GitHub repo
+3. Set **Root Directory** to `backend/`
+4. Render auto-detects the Dockerfile — click **Deploy**
+5. You get a URL like `https://formiq-backend.onrender.com`
+6. Copy that URL
+
 ### Frontend → Vercel
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
-1. Connect your GitHub repo
-2. Vercel auto-detects the `vercel.json` config
-3. Set `VITE_API_URL` env var to your deployed Railway backend URL
 
-### Backend → Railway
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
-1. Click the button or create a new Railway project
-2. Connect your GitHub repo, set root directory to `backend/`
-3. Railway auto-detects the `Dockerfile`
-4. It deploys at `https://your-app.up.railway.app`
-5. Copy that URL → set as `VITE_API_URL` in Vercel
+1. Go to [vercel.com](https://vercel.com) and import your GitHub repo
+2. Vercel auto-detects the config — just deploy
+3. Go to project **Settings → Environment Variables**
+4. Add `VITE_API_URL = https://formiq-backend.onrender.com` (your Render URL)
+5. Redeploy
 
-Or deploy manually:
-```bash
-# Install Railway CLI
-npm i -g @railway/cli
-railway login
-railway init
-railway up --root-dir backend
-```
+That's it. Your frontend on Vercel talks to the backend on Render.
 
 ## How It Works
 
@@ -67,21 +65,21 @@ railway up --root-dir backend
 ## Project Structure
 
 ```
-├── frontend/          # React + Vite + Tailwind
+├── frontend/            # React + Vite + Tailwind
 │   ├── src/
-│   │   ├── pages/     # UploadPage, ResultsPage
+│   │   ├── pages/      # UploadPage, ResultsPage
 │   │   ├── components/ # VideoUploader, ScoreDisplay, FeedbackList
-│   │   └── api.js     # Axios → backend
-│   └── vercel.json
-├── backend/           # Python FastAPI
-│   ├── main.py        # API endpoints
+│   │   └── api.js      # Axios → backend
+├── backend/             # Python FastAPI
+│   ├── main.py         # API endpoints
 │   ├── pose_analyzer.py # MediaPipe + angles
-│   ├── rules.py       # Form rules + scoring
-│   ├── schemas.py     # Pydantic models
-│   ├── Dockerfile     # Railway-ready
+│   ├── rules.py        # Form rules + scoring
+│   ├── schemas.py      # Pydantic models
+│   ├── Dockerfile      # Render-ready
 │   └── requirements.txt
-├── sample_video/      # Test clip
-├── vercel.json        # Vercel monorepo config
+├── sample_video/       # Test clip
+├── render.yaml         # Render deploy config
+├── vercel.json         # Vercel config
 └── README.md
 ```
 
@@ -89,3 +87,4 @@ railway up --root-dir backend
 
 **Frontend**: React, Vite, Tailwind CSS, React Router, Axios
 **Backend**: Python, FastAPI, MediaPipe Pose, OpenCV, NumPy
+**Deploy**: Vercel (frontend) + Render (backend, free tier)
