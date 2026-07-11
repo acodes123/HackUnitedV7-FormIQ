@@ -6,8 +6,6 @@ dist-ssr
 temp_videos/
 *.mp4
 *.mov
-!sample_video/*.mp4
-
 # Logs
 logs
 *.log
