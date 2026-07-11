@@ -15,6 +15,9 @@ def angle_between(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
 
 class PoseAnalyzer:
     def __init__(self):
+        import os
+        os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'
+
         import cv2
         from mediapipe.python.solutions import pose as mp_pose
 
